@@ -1,0 +1,20 @@
+name: fluid_adaptive
+description: "A modern, robust, and adaptive responsive design toolkit for Flutter. Solves multi-screen adaptation through content-budgeting, adaptive layouts, fluid clamping, and jitter-free window metrics instead of blind scaling."
+version: 1.0.0
+homepage: https://github.com/redaessa7/fluid_adaptive
+repository: https://github.com/redaessa7/fluid_adaptive
+
+environment:
+  sdk: ^3.13.5
+  flutter: ">=3.16.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:

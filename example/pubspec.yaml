@@ -1,0 +1,17 @@
+name: example
+description: "Demonstration of fluid_adaptive features."
+publish_to: "none"
+version: 1.0.0
+
+environment:
+  sdk: ^3.13.5
+  flutter: ">=3.16.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  fluid_adaptive:
+    path: ../
+
+flutter:
+  uses-material-design: true
