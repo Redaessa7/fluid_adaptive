@@ -28,7 +28,7 @@ jobs:
           flutter create --platforms=web .
           flutter pub get
           flutter build web --release --base-href "/fluid_adaptive/"
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: example/build/web
 
