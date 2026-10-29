@@ -2,13 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fluid_adaptive/fluid_adaptive.dart';
 
 void main() {
-  runApp(
-    // 1. ResponsiveWindowGate wraps the root to settle keyboard jitter
-    //    and trigger immediate rebuilds on real rotation/resizing.
-    const ResponsiveWindowGate(
-      child: ResponsiveDemoApp(),
-    ),
-  );
+  runApp(const ResponsiveDemoApp());
 }
 
 class ResponsiveDemoApp extends StatelessWidget {
@@ -44,7 +38,7 @@ class DemoHomePage extends StatelessWidget {
       body: ResponsiveCenter(
         maxWidth: 1000,
         child: SingleChildScrollView(
-          padding: context.responsive.gutters(compact: 16, vertical: 16),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -56,19 +50,22 @@ class DemoHomePage extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Text already applies the user's text scale itself,
+                      // so a plain fontSize is correct here.
                       Text(
-                        '⚡ Smart Numeric Extensions (Easy as ScreenUtil, but Safe!)',
+                        'Smart numeric extensions',
                         style: TextStyle(
-                          fontSize: 16.sp(context),
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: Colors.deepPurple.shade900,
                         ),
                       ),
                       8.gapH,
-                      Text('• 16.sp(context) -> Safe font size honoring accessibility.'),
+                      Icon(Icons.text_fields, size: 24.textScaled(context, maxScaleFactor: 2)),
+                      Text('• 24.textScaled(context) -> icon size that follows the text scale.'),
                       Text('• 16.fluid(context, max: 24) -> ${16.fluid(context, max: 24).toStringAsFixed(1)} dp'),
                       Text('• 100.clampedW(context) -> ${100.clampedW(context).toStringAsFixed(1)} dp (Never blows up on tablets!)'),
-                      Text('• 200.responsive(context, tablet: 350) -> ${200.responsive(context, tablet: 350).toStringAsFixed(1)} dp'),
+                      Text('• 200.responsive(context, medium: 350) -> ${200.responsive(context, medium: 350).toStringAsFixed(1)} dp'),
                       Text('• context.spacing.md -> ${context.spacing.md} dp'),
                     ],
                   ),
@@ -93,7 +90,7 @@ class DemoHomePage extends StatelessWidget {
                       8.gapH,
                       Text('• Size Class: ${info.sizeClass.name}'),
                       Text('• Local Width: ${info.localWidth.toStringAsFixed(1)} dp'),
-                      Text('• Window Width: ${info.windowWidth.toStringAsFixed(1)} dp'),
+                      Text('• Window Width: ${info.windowSize.width.toStringAsFixed(1)} dp'),
                       Text('• Is Wide (>=600): ${info.isWide}'),
                       Text('• Calculated Gutters: ${info.gutter(compact: 16).toStringAsFixed(1)} dp'),
                       Text('• Fluid Heading Size: ${info.fluid(min: 16, max: 28).toStringAsFixed(1)} pt'),
@@ -153,7 +150,7 @@ class DemoHomePage extends StatelessWidget {
 
               Text(
                 'Adaptive Product / Service Grid',
-                style: Theme.of(context).textTheme.titleMedium?.responsiveScale(context),
+                style: Theme.of(context).textTheme.titleMedium,
               ),
               12.gapH,
 

@@ -2,13 +2,12 @@ import 'package:flutter/widgets.dart';
 import 'package:fluid_adaptive/src/breakpoints/breakpoints.dart';
 import 'package:fluid_adaptive/src/widgets/responsive_builder.dart';
 
-/// Declaratively switches between widget layouts based on the active [WindowSizeClass].
+/// Switches between layouts according to the available width.
 ///
-/// Unspecified larger layouts automatically fall back to the nearest available smaller layout:
-/// - [large] falls back to [expanded], then [medium], then [compact].
-/// - [expanded] falls back to [medium], then [compact].
-/// - [medium] falls back to [compact].
+/// A missing larger layout falls back to the nearest smaller one:
+/// [large] to [expanded] to [medium] to [compact].
 class ResponsiveLayout extends StatelessWidget {
+  /// Creates a layout switch. Only [compact] is required.
   const ResponsiveLayout({
     super.key,
     required this.compact,
@@ -18,19 +17,20 @@ class ResponsiveLayout extends StatelessWidget {
     this.breakpoints,
   });
 
-  /// Widget builder for phone/compact viewports (< 600dp). Required as base layout.
+  /// Layout for compact widths (< 600dp). Also the final fallback.
   final WidgetBuilder compact;
 
-  /// Optional widget builder for small tablets / landscape phones (600dp - 839dp).
+  /// Layout for medium widths (600dp - 839dp).
   final WidgetBuilder? medium;
 
-  /// Optional widget builder for large tablets / small laptops (840dp - 1199dp).
+  /// Layout for expanded widths (840dp - 1199dp).
   final WidgetBuilder? expanded;
 
-  /// Optional widget builder for desktop / ultra-wide screens (>= 1200dp).
+  /// Layout for large widths (>= 1200dp).
   final WidgetBuilder? large;
 
-  /// Optional custom breakpoints. Defaults to [ResponsiveBreakpoints.standard].
+  /// Breakpoints to use; defaults to the nearest `ResponsiveConfig`, then
+  /// [ResponsiveBreakpoints.standard].
   final ResponsiveBreakpoints? breakpoints;
 
   @override

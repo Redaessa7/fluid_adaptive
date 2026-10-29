@@ -1,41 +1,46 @@
 import 'package:flutter/foundation.dart';
 import 'package:fluid_adaptive/src/breakpoints/window_size_class.dart';
-import 'package:fluid_adaptive/src/gutters/gutters.dart';
+import 'package:fluid_adaptive/src/core/defaults.dart';
 
-/// Configurable breakpoints and sizing boundaries for adaptive layouts.
+/// Configurable breakpoints for adaptive layouts.
 ///
-/// Decisions are always based on the available width (via [LayoutBuilder]
-/// or [MediaQuery]), enabling components to respond correctly inside split screens,
-/// modals, foldables, and desktop windows.
+/// Decisions are always based on the **available width** (from a
+/// `LayoutBuilder` or `MediaQuery`), so components respond correctly inside
+/// split screens, dialogs, foldables and desktop windows.
 @immutable
-class ResponsiveBreakpoints {
-  /// Creates a custom set of breakpoints.
+final class ResponsiveBreakpoints {
+  /// Creates a set of breakpoints. Values must be strictly increasing.
   const ResponsiveBreakpoints({
     this.compactMax = 600.0,
     this.mediumMax = 840.0,
     this.expandedMax = 1200.0,
-    this.contentMaxWidth = 720.0,
-  }) : assert(compactMax > 0 && mediumMax > compactMax && expandedMax > mediumMax,
-            'Breakpoints must be strictly increasing');
+    this.contentMaxWidth = ResponsiveDefaults.contentMaxWidth,
+  }) : assert(
+          compactMax > 0 && mediumMax > compactMax && expandedMax > mediumMax,
+          'Breakpoints must be strictly increasing',
+        );
 
-  /// Standard industry-standard Material 3 breakpoints.
+  /// The standard Material 3 breakpoints (600 / 840 / 1200).
   static const ResponsiveBreakpoints standard = ResponsiveBreakpoints();
 
-  /// Phones: single-column layouts, default phone rhythm.
+  /// Widths below this value are [WindowSizeClass.compact].
   final double compactMax;
 
-  /// Small tablets / unfolded foldables / landscape phones: 2-column content.
+  /// Widths below this value (and at least [compactMax]) are
+  /// [WindowSizeClass.medium].
   final double mediumMax;
 
-  /// Large tablets / desktop windows.
+  /// Widths below this value (and at least [mediumMax]) are
+  /// [WindowSizeClass.expanded]; anything wider is [WindowSizeClass.large].
   final double expandedMax;
 
-  /// Shared centered-content budget, so gutters across screens line up uniformly.
+  /// Default content width budget used by gutters, so page padding lines up
+  /// across screens.
   final double contentMaxWidth;
 
-  /// Classifies [width] into a [WindowSizeClass].
+  /// Classifies [width] into a [WindowSizeClass]. NaN counts as compact.
   WindowSizeClass sizeClassFor(double width) {
-    if (width < compactMax) {
+    if (width.isNaN || width < compactMax) {
       return WindowSizeClass.compact;
     }
     if (width < mediumMax) {
@@ -47,29 +52,48 @@ class ResponsiveBreakpoints {
     return WindowSizeClass.large;
   }
 
-  /// Whether [width] qualifies as a wide viewport (tablet, foldable, desktop).
-  bool isWide(double width) => width >= compactMax;
-
-  /// Computes the side gutter for [width]: uses [compactGutter] below [contentMaxWidth],
-  /// and expands symmetrically above it so content stays centered.
-  double guttersFor(double width, {required double compactGutter}) =>
-      ResponsiveGutters.sideOf(
-        width,
-        gutter: compactGutter,
-        contentMaxWidth: contentMaxWidth,
-      );
-
-  /// Automatically computes column count for a grid whose tiles want at least
-  /// [minTileWidth] logical dp each, bounded between [minColumns] and [maxColumns].
+  /// Number of grid columns for [width] so that every tile is at least
+  /// [minTileWidth] wide, bounded by [minColumns] and [maxColumns].
+  ///
+  /// Pass [spacing] (gap between tiles) and [padding] (total padding along the
+  /// same axis) for exact results. Never throws on odd input: inconsistent
+  /// bounds are normalised and non-finite or non-positive widths return the
+  /// minimum column count.
   int columnsFor(
     double width, {
-    double minTileWidth = 170.0,
-    int minColumns = 2,
-    int maxColumns = 8,
+    double minTileWidth = ResponsiveDefaults.minTileWidth,
+    int minColumns = ResponsiveDefaults.minColumns,
+    int maxColumns = ResponsiveDefaults.maxColumns,
+    double spacing = 0.0,
+    double padding = 0.0,
   }) {
-    if (width <= 0 || minTileWidth <= 0) return minColumns;
-    final int raw = (width / minTileWidth).floor();
-    return raw.clamp(minColumns, maxColumns);
+    final int lo = minColumns < 1 ? 1 : minColumns;
+    final int hi = maxColumns < lo ? lo : maxColumns;
+    final double gap = spacing < 0 ? 0.0 : spacing;
+    final double usable = width - padding;
+    if (!usable.isFinite ||
+        usable <= 0 ||
+        !minTileWidth.isFinite ||
+        minTileWidth <= 0) {
+      return lo;
+    }
+    final int raw = ((usable + gap) / (minTileWidth + gap)).floor();
+    return raw.clamp(lo, hi);
+  }
+
+  /// Returns a copy with the given fields replaced.
+  ResponsiveBreakpoints copyWith({
+    double? compactMax,
+    double? mediumMax,
+    double? expandedMax,
+    double? contentMaxWidth,
+  }) {
+    return ResponsiveBreakpoints(
+      compactMax: compactMax ?? this.compactMax,
+      mediumMax: mediumMax ?? this.mediumMax,
+      expandedMax: expandedMax ?? this.expandedMax,
+      contentMaxWidth: contentMaxWidth ?? this.contentMaxWidth,
+    );
   }
 
   @override
@@ -84,4 +108,9 @@ class ResponsiveBreakpoints {
   @override
   int get hashCode =>
       Object.hash(compactMax, mediumMax, expandedMax, contentMaxWidth);
+
+  @override
+  String toString() => 'ResponsiveBreakpoints(compactMax: $compactMax, '
+      'mediumMax: $mediumMax, expandedMax: $expandedMax, '
+      'contentMaxWidth: $contentMaxWidth)';
 }

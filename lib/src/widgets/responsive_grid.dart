@@ -1,18 +1,26 @@
 import 'package:flutter/widgets.dart';
+import 'package:fluid_adaptive/src/core/defaults.dart';
+import 'package:fluid_adaptive/src/core/responsive_info.dart';
 import 'package:fluid_adaptive/src/widgets/responsive_builder.dart';
+import 'package:fluid_adaptive/src/widgets/responsive_sliver_builder.dart';
 
-/// An adaptive GridView that automatically computes its column count based on
-/// available parent width and a minimum tile width ([minTileWidth]).
+/// A [GridView] whose column count follows the available width so that every
+/// tile is at least [minTileWidth] wide (padding and spacing included).
+///
+/// Use the `.builder` constructor for long lists and `.count` for a fixed list
+/// of [children]. Built on `ResponsiveBuilder`, so it measures the space it is
+/// given, not the screen.
 class ResponsiveGridView extends StatelessWidget {
+  /// Creates a grid that builds its tiles lazily.
   const ResponsiveGridView.builder({
     super.key,
-    required this.itemCount,
-    required this.itemBuilder,
-    this.minTileWidth = 170.0,
-    this.minColumns = 2,
-    this.maxColumns = 8,
-    this.crossAxisSpacing = 12.0,
-    this.mainAxisSpacing = 12.0,
+    required int this.itemCount,
+    required NullableIndexedWidgetBuilder this.itemBuilder,
+    this.minTileWidth = ResponsiveDefaults.minTileWidth,
+    this.minColumns = ResponsiveDefaults.minColumns,
+    this.maxColumns = ResponsiveDefaults.maxColumns,
+    this.crossAxisSpacing = ResponsiveDefaults.gridSpacing,
+    this.mainAxisSpacing = ResponsiveDefaults.gridSpacing,
     this.childAspectRatio = 1.0,
     this.mainAxisExtent,
     this.padding,
@@ -22,14 +30,15 @@ class ResponsiveGridView extends StatelessWidget {
     this.scrollDirection = Axis.vertical,
   }) : children = null;
 
+  /// Creates a grid from a fixed list of [children].
   const ResponsiveGridView.count({
     super.key,
-    required this.children,
-    this.minTileWidth = 170.0,
-    this.minColumns = 2,
-    this.maxColumns = 8,
-    this.crossAxisSpacing = 12.0,
-    this.mainAxisSpacing = 12.0,
+    required List<Widget> this.children,
+    this.minTileWidth = ResponsiveDefaults.minTileWidth,
+    this.minColumns = ResponsiveDefaults.minColumns,
+    this.maxColumns = ResponsiveDefaults.maxColumns,
+    this.crossAxisSpacing = ResponsiveDefaults.gridSpacing,
+    this.mainAxisSpacing = ResponsiveDefaults.gridSpacing,
     this.childAspectRatio = 1.0,
     this.mainAxisExtent,
     this.padding,
@@ -40,48 +49,76 @@ class ResponsiveGridView extends StatelessWidget {
   })  : itemCount = null,
         itemBuilder = null;
 
+  /// Number of tiles for the `.builder` constructor.
   final int? itemCount;
+
+  /// Tile factory for the `.builder` constructor.
   final NullableIndexedWidgetBuilder? itemBuilder;
+
+  /// Tiles for the `.count` constructor.
   final List<Widget>? children;
 
-  /// Minimum width in logical dp desired for each grid item.
+  /// Minimum tile width along the grid's cross axis (default 170).
   final double minTileWidth;
 
-  /// Minimum number of columns allowed.
+  /// Lower bound for the column count (default 2).
   final int minColumns;
 
-  /// Maximum number of columns allowed.
+  /// Upper bound for the column count (default 8).
   final int maxColumns;
 
+  /// Gap between tiles along the cross axis (default 12).
   final double crossAxisSpacing;
+
+  /// Gap between tiles along the main axis (default 12).
   final double mainAxisSpacing;
+
+  /// Width / height ratio of each tile; ignored when [mainAxisExtent] is set.
   final double childAspectRatio;
+
+  /// Fixed tile extent along the main axis (use for text-heavy tiles).
   final double? mainAxisExtent;
+
+  /// Padding around the grid.
   final EdgeInsetsGeometry? padding;
+
+  /// Forwarded to the underlying [GridView].
   final ScrollPhysics? physics;
+
+  /// Forwarded to the underlying [GridView].
   final bool shrinkWrap;
+
+  /// Forwarded to the underlying [GridView].
   final ScrollController? controller;
+
+  /// Scroll direction; a horizontal grid measures its height for columns.
   final Axis scrollDirection;
 
   @override
   Widget build(BuildContext context) {
     return ResponsiveBuilder(
       builder: (context, info) {
-        final int columns = info.columns(
+        final EdgeInsets? resolved = padding?.resolve(
+          Directionality.maybeOf(context) ?? TextDirection.ltr,
+        );
+        final bool vertical = scrollDirection == Axis.vertical;
+        final gridDelegate = _gridDelegate(
+          info,
+          scrollDirection: scrollDirection,
           minTileWidth: minTileWidth,
           minColumns: minColumns,
           maxColumns: maxColumns,
-        );
-
-        final gridDelegate = SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: columns,
           crossAxisSpacing: crossAxisSpacing,
           mainAxisSpacing: mainAxisSpacing,
           childAspectRatio: childAspectRatio,
           mainAxisExtent: mainAxisExtent,
+          crossAxisPadding: resolved == null
+              ? 0.0
+              : (vertical ? resolved.horizontal : resolved.vertical),
         );
 
-        if (children != null) {
+        final List<Widget>? fixed = children;
+        if (fixed != null) {
           return GridView(
             controller: controller,
             padding: padding,
@@ -89,7 +126,7 @@ class ResponsiveGridView extends StatelessWidget {
             shrinkWrap: shrinkWrap,
             scrollDirection: scrollDirection,
             gridDelegate: gridDelegate,
-            children: children!,
+            children: fixed,
           );
         }
 
@@ -108,70 +145,91 @@ class ResponsiveGridView extends StatelessWidget {
   }
 }
 
-/// A SliverGrid that automatically determines column count based on available width.
+/// A [SliverGrid] whose column count follows the viewport width so that every
+/// tile is at least [minTileWidth] wide (spacing included).
+///
+/// Measures the sliver's cross-axis extent, so wrapping it in a
+/// `SliverPadding` or `ResponsiveSliverCenter` is accounted for. Vertical
+/// viewports only.
 class ResponsiveSliverGrid extends StatelessWidget {
+  /// Creates a sliver grid that builds its tiles lazily.
   const ResponsiveSliverGrid.builder({
     super.key,
-    required this.itemCount,
-    required this.itemBuilder,
-    this.minTileWidth = 170.0,
-    this.minColumns = 2,
-    this.maxColumns = 8,
-    this.crossAxisSpacing = 12.0,
-    this.mainAxisSpacing = 12.0,
+    required int this.itemCount,
+    required NullableIndexedWidgetBuilder this.itemBuilder,
+    this.minTileWidth = ResponsiveDefaults.minTileWidth,
+    this.minColumns = ResponsiveDefaults.minColumns,
+    this.maxColumns = ResponsiveDefaults.maxColumns,
+    this.crossAxisSpacing = ResponsiveDefaults.gridSpacing,
+    this.mainAxisSpacing = ResponsiveDefaults.gridSpacing,
     this.childAspectRatio = 1.0,
     this.mainAxisExtent,
   }) : delegate = null;
 
+  /// Creates a sliver grid from a [SliverChildDelegate].
   const ResponsiveSliverGrid({
     super.key,
-    required this.delegate,
-    this.minTileWidth = 170.0,
-    this.minColumns = 2,
-    this.maxColumns = 8,
-    this.crossAxisSpacing = 12.0,
-    this.mainAxisSpacing = 12.0,
+    required SliverChildDelegate this.delegate,
+    this.minTileWidth = ResponsiveDefaults.minTileWidth,
+    this.minColumns = ResponsiveDefaults.minColumns,
+    this.maxColumns = ResponsiveDefaults.maxColumns,
+    this.crossAxisSpacing = ResponsiveDefaults.gridSpacing,
+    this.mainAxisSpacing = ResponsiveDefaults.gridSpacing,
     this.childAspectRatio = 1.0,
     this.mainAxisExtent,
   })  : itemCount = null,
         itemBuilder = null;
 
+  /// Child delegate for the default constructor.
   final SliverChildDelegate? delegate;
+
+  /// Number of tiles for the `.builder` constructor.
   final int? itemCount;
+
+  /// Tile factory for the `.builder` constructor.
   final NullableIndexedWidgetBuilder? itemBuilder;
+
+  /// Minimum tile width (default 170).
   final double minTileWidth;
+
+  /// Lower bound for the column count (default 2).
   final int minColumns;
+
+  /// Upper bound for the column count (default 8).
   final int maxColumns;
+
+  /// Gap between tiles along the cross axis (default 12).
   final double crossAxisSpacing;
+
+  /// Gap between tiles along the main axis (default 12).
   final double mainAxisSpacing;
+
+  /// Width / height ratio of each tile; ignored when [mainAxisExtent] is set.
   final double childAspectRatio;
+
+  /// Fixed tile extent along the main axis (use for text-heavy tiles).
   final double? mainAxisExtent;
 
   @override
   Widget build(BuildContext context) {
-    return ResponsiveBuilder(
+    return ResponsiveSliverBuilder(
       builder: (context, info) {
-        final int columns = info.columns(
+        final gridDelegate = _gridDelegate(
+          info,
+          scrollDirection: Axis.vertical,
           minTileWidth: minTileWidth,
           minColumns: minColumns,
           maxColumns: maxColumns,
-        );
-
-        final gridDelegate = SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: columns,
           crossAxisSpacing: crossAxisSpacing,
           mainAxisSpacing: mainAxisSpacing,
           childAspectRatio: childAspectRatio,
           mainAxisExtent: mainAxisExtent,
         );
 
-        if (delegate != null) {
-          return SliverGrid(
-            gridDelegate: gridDelegate,
-            delegate: delegate!,
-          );
+        final SliverChildDelegate? custom = delegate;
+        if (custom != null) {
+          return SliverGrid(gridDelegate: gridDelegate, delegate: custom);
         }
-
         return SliverGrid.builder(
           gridDelegate: gridDelegate,
           itemCount: itemCount,
@@ -180,4 +238,39 @@ class ResponsiveSliverGrid extends StatelessWidget {
       },
     );
   }
+}
+
+/// Shared by both grids: chooses the column count so every tile is at least
+/// `minTileWidth` along the grid's cross axis (width when scrolling vertically,
+/// height when scrolling horizontally).
+SliverGridDelegateWithFixedCrossAxisCount _gridDelegate(
+  ResponsiveInfo info, {
+  required Axis scrollDirection,
+  required double minTileWidth,
+  required int minColumns,
+  required int maxColumns,
+  required double crossAxisSpacing,
+  required double mainAxisSpacing,
+  required double childAspectRatio,
+  required double? mainAxisExtent,
+  double crossAxisPadding = 0.0,
+}) {
+  final double crossExtent = scrollDirection == Axis.vertical
+      ? info.localSize.width
+      : info.localSize.height;
+  final int columns = info.breakpoints.columnsFor(
+    crossExtent,
+    minTileWidth: minTileWidth,
+    minColumns: minColumns,
+    maxColumns: maxColumns,
+    spacing: crossAxisSpacing,
+    padding: crossAxisPadding,
+  );
+  return SliverGridDelegateWithFixedCrossAxisCount(
+    crossAxisCount: columns,
+    crossAxisSpacing: crossAxisSpacing,
+    mainAxisSpacing: mainAxisSpacing,
+    childAspectRatio: childAspectRatio,
+    mainAxisExtent: mainAxisExtent,
+  );
 }

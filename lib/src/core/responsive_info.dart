@@ -1,17 +1,18 @@
 import 'package:flutter/widgets.dart';
 import 'package:fluid_adaptive/src/breakpoints/breakpoints.dart';
 import 'package:fluid_adaptive/src/breakpoints/window_size_class.dart';
-import 'package:fluid_adaptive/src/gutters/gutters.dart';
-import 'package:fluid_adaptive/src/spacing/spacing.dart';
+import 'package:fluid_adaptive/src/core/defaults.dart';
+import 'package:fluid_adaptive/src/math/fluid.dart';
+import 'package:fluid_adaptive/src/math/gutters.dart';
 
-/// Complete snapshot of the responsive metrics for the active subtree.
+/// Snapshot of the responsive metrics for a subtree.
 ///
-/// Contains both [localSize] (granted by the parent widget / [LayoutBuilder])
-/// and [windowSize] (the whole app window via [MediaQuery.sizeOf]).
-/// This ensures nested widgets (like split views, sheets, or sidebars)
-/// adapt to their actual bounding box rather than assuming they own the whole screen.
+/// [localSize] is the space the subtree really gets (from a `LayoutBuilder`),
+/// [windowSize] is the whole app window. Nested panels, sheets and sidebars
+/// should adapt to [localSize], not to the device.
 @immutable
-class ResponsiveInfo {
+final class ResponsiveInfo {
+  /// Creates a snapshot. Prefer [ResponsiveInfo.fromSize] for tests.
   const ResponsiveInfo({
     required this.windowSize,
     required this.localSize,
@@ -19,66 +20,70 @@ class ResponsiveInfo {
     this.breakpoints = ResponsiveBreakpoints.standard,
   });
 
-  /// The full app window size (from [MediaQuery.sizeOf]).
+  /// Builds a snapshot from a plain [size], without any widget tree.
+  ///
+  /// Handy for unit tests, golden tests and previews:
+  /// ```dart
+  /// final info = ResponsiveInfo.fromSize(const Size(700, 900));
+  /// expect(info.isMedium, isTrue);
+  /// ```
+  factory ResponsiveInfo.fromSize(
+    Size size, {
+    Size? windowSize,
+    ResponsiveBreakpoints breakpoints = ResponsiveBreakpoints.standard,
+  }) {
+    return ResponsiveInfo(
+      windowSize: windowSize ?? size,
+      localSize: size,
+      sizeClass: breakpoints.sizeClassFor(size.width),
+      breakpoints: breakpoints,
+    );
+  }
+
+  /// Size of the whole app window.
   final Size windowSize;
 
-  /// The size available to the local subtree (from [LayoutBuilder]).
+  /// Size available to the local subtree.
   final Size localSize;
 
-  /// The active [WindowSizeClass] based on [localSize.width].
+  /// Size class derived from the width of [localSize].
   final WindowSizeClass sizeClass;
 
-  /// The active breakpoint configuration.
+  /// Breakpoints used to derive [sizeClass].
   final ResponsiveBreakpoints breakpoints;
 
-  /// Available width in logical dp for this subtree.
+  /// Available width of the local subtree in logical pixels.
   double get localWidth => localSize.width;
 
-  /// Available height in logical dp for this subtree.
+  /// Available height of the local subtree in logical pixels.
   double get localHeight => localSize.height;
 
-  /// Total width of the application window in logical dp.
-  double get windowWidth => windowSize.width;
-
-  /// Total height of the application window in logical dp.
-  double get windowHeight => windowSize.height;
-
-  /// True when local width is in phone range (< [breakpoints.compactMax]).
+  /// True when [sizeClass] is [WindowSizeClass.compact].
   bool get isCompact => sizeClass.isCompact;
 
-  /// True when local width is in small tablet range ([breakpoints.compactMax] to [breakpoints.mediumMax]).
+  /// True when [sizeClass] is [WindowSizeClass.medium].
   bool get isMedium => sizeClass.isMedium;
 
-  /// True when local width is in large tablet range ([breakpoints.mediumMax] to [breakpoints.expandedMax]).
+  /// True when [sizeClass] is [WindowSizeClass.expanded].
   bool get isExpanded => sizeClass.isExpanded;
 
-  /// True when local width is large desktop range (>= [breakpoints.expandedMax]).
+  /// True when [sizeClass] is [WindowSizeClass.large].
   bool get isLarge => sizeClass.isLarge;
 
-  /// True when local width allows multi-column layouts (>= [breakpoints.compactMax]).
+  /// True when the width allows multi-column layouts (anything but compact).
   bool get isWide => sizeClass.isWide;
 
-  /// True if local layout is phone-sized.
-  bool get isPhone => isCompact;
-
-  /// True if local layout is tablet-sized (medium or expanded).
-  bool get isTablet => sizeClass.isTablet;
-
-  /// True if local layout is desktop-sized (large).
-  bool get isDesktop => isLarge;
-
-  /// True if the local width is greater than height.
+  /// True when [localSize] is wider than it is tall.
   bool get isLandscape => localSize.width > localSize.height;
 
-  /// True if the local height is greater than or equal to width.
+  /// True when [localSize] is at least as tall as it is wide.
   bool get isPortrait => !isLandscape;
 
-  /// Local aspect ratio (width / height).
-  double get aspectRatio =>
-      localSize.height <= 0 ? 0.0 : localSize.width / localSize.height;
-
-  /// Computes the horizontal gutter for the current local width.
-  double gutter({double compact = 16.0, double? contentMaxWidth}) {
+  /// Horizontal gutter for the local width; see [ResponsiveGutters.sideOf].
+  double gutter({
+    double compact = ResponsiveDefaults.compactGutter,
+    double? contentMaxWidth,
+  }) {
     return ResponsiveGutters.sideOf(
       localSize.width,
       gutter: compact,
@@ -86,9 +91,10 @@ class ResponsiveInfo {
     );
   }
 
-  /// Computes symmetric horizontal EdgeInsets for the current local width.
+  /// Symmetric page padding for the local width; see
+  /// [ResponsiveGutters.horizontal].
   EdgeInsets gutters({
-    double compact = 16.0,
+    double compact = ResponsiveDefaults.compactGutter,
     double? contentMaxWidth,
     double vertical = 0.0,
   }) {
@@ -100,83 +106,45 @@ class ResponsiveInfo {
     );
   }
 
-  /// Computes directional EdgeInsetsDirectional for the current local width.
-  EdgeInsetsDirectional directionalGutters({
-    double compact = 16.0,
-    double? contentMaxWidth,
-    double top = 0.0,
-    double bottom = 0.0,
-  }) {
-    return ResponsiveGutters.directional(
-      localSize.width,
-      gutter: compact,
-      contentMaxWidth: contentMaxWidth ?? breakpoints.contentMaxWidth,
-      top: top,
-      bottom: bottom,
-    );
-  }
-
-  /// Automatically computes column count for grid layouts based on [localWidth].
+  /// Grid column count for the local width; see
+  /// [ResponsiveBreakpoints.columnsFor].
   int columns({
-    double minTileWidth = 170.0,
-    int minColumns = 2,
-    int maxColumns = 8,
+    double minTileWidth = ResponsiveDefaults.minTileWidth,
+    int minColumns = ResponsiveDefaults.minColumns,
+    int maxColumns = ResponsiveDefaults.maxColumns,
+    double spacing = 0.0,
+    double padding = 0.0,
   }) {
     return breakpoints.columnsFor(
       localSize.width,
       minTileWidth: minTileWidth,
       minColumns: minColumns,
       maxColumns: maxColumns,
+      spacing: spacing,
+      padding: padding,
     );
   }
 
-  /// Returns fluid clamped sizing interpolated according to [localWidth].
+  /// Fluid value between [min] and [max] for the local width; see
+  /// [ResponsiveFluid.clampedLerp]. [minWidth] defaults to 375 and [maxWidth]
+  /// to `breakpoints.expandedMax`.
   double fluid({
     required double min,
     required double max,
     double? minWidth,
     double? maxWidth,
   }) {
-    return ResponsiveSpacing.fluid(
+    return ResponsiveFluid.clampedLerp(
       width: localSize.width,
       min: min,
       max: max,
-      minWidth: minWidth ?? 375.0,
+      minWidth: minWidth ?? ResponsiveDefaults.designWidth,
       maxWidth: maxWidth ?? breakpoints.expandedMax,
     );
   }
 
-  /// Resolves standard stepped spacing based on [localWidth].
-  double spacing({
-    double compact = 12.0,
-    double medium = 16.0,
-    double expanded = 24.0,
-  }) {
-    return ResponsiveSpacing.spacingFor(
-      localSize.width,
-      compact: compact,
-      medium: medium,
-      expanded: expanded,
-      compactBreakpoint: breakpoints.compactMax,
-      mediumBreakpoint: breakpoints.mediumMax,
-    );
-  }
-
-  /// Resolves clamped border radius based on [localWidth].
-  double radius({
-    double min = 12.0,
-    double max = 28.0,
-    double divisor = 40.0,
-  }) {
-    return ResponsiveSpacing.radiusFor(
-      localSize.width,
-      min: min,
-      max: max,
-      divisor: divisor,
-    );
-  }
-
-  /// Resolves a value according to the active [sizeClass].
+  /// Picks the value for the active [sizeClass]; larger classes fall back to
+  /// the nearest smaller one (see [WindowSizeClass.resolve]).
   T value<T>({
     required T compact,
     T? medium,
@@ -189,22 +157,6 @@ class ResponsiveInfo {
       expanded: expanded,
       large: large,
     );
-  }
-
-  /// Declarative builder switching for widgets based on the active [sizeClass].
-  Widget when({
-    required Widget Function() compact,
-    Widget Function()? medium,
-    Widget Function()? expanded,
-    Widget Function()? large,
-  }) {
-    final builder = sizeClass.resolve(
-      compact: compact,
-      medium: medium,
-      expanded: expanded,
-      large: large,
-    );
-    return builder();
   }
 
   @override
@@ -221,6 +173,6 @@ class ResponsiveInfo {
       Object.hash(windowSize, localSize, sizeClass, breakpoints);
 
   @override
-  String toString() =>
-      'ResponsiveInfo(sizeClass: $sizeClass, localSize: $localSize, windowSize: $windowSize)';
+  String toString() => 'ResponsiveInfo(sizeClass: $sizeClass, '
+      'localSize: $localSize, windowSize: $windowSize)';
 }
