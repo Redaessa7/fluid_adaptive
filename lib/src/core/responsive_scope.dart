@@ -1,36 +1,35 @@
 import 'package:flutter/widgets.dart';
-import 'package:fluid_adaptive/src/breakpoints/breakpoints.dart';
+import 'package:fluid_adaptive/src/core/responsive_config.dart';
 import 'package:fluid_adaptive/src/core/responsive_info.dart';
 
-/// Provides [ResponsiveInfo] down the widget tree using an [InheritedWidget].
+/// Provides a [ResponsiveInfo] to a subtree.
 ///
-/// Can be accessed via [ResponsiveScope.of(context)] or `context.responsive`.
-class ResponsiveScope extends InheritedWidget {
+/// Created by `ResponsiveBuilder`, `ResponsiveSliverBuilder`,
+/// `ResponsiveLayout`, `ResponsiveRowColumn` and the grid widgets. Read it
+/// with [ResponsiveScope.of] or `context.responsive`.
+final class ResponsiveScope extends InheritedWidget {
+  /// Creates a scope that exposes [info] to [child].
   const ResponsiveScope({
     super.key,
     required this.info,
     required super.child,
   });
 
-  /// The active responsive snapshot for this subtree.
+  /// The snapshot for this subtree.
   final ResponsiveInfo info;
 
-  /// Returns the nearest [ResponsiveInfo] in the widget tree.
+  /// Returns the nearest [ResponsiveInfo].
   ///
-  /// If no [ResponsiveScope] is found above the widget, this falls back
-  /// gracefully to a window-level [ResponsiveInfo] derived from [MediaQuery.sizeOf],
-  /// avoiding runtime assertion crashes while still encouraging [ResponsiveBuilder]
-  /// for constraint-based adaptive nesting.
+  /// Inside a responsive builder this describes the space that subtree gets.
+  /// Anywhere else it falls back to the **window** size from
+  /// `MediaQuery.sizeOf` and the breakpoints of the nearest
+  /// [ResponsiveConfig]. Requires a `MediaQuery` ancestor in that case.
   static ResponsiveInfo of(BuildContext context) {
-    final scope =
-        context.dependOnInheritedWidgetOfExactType<ResponsiveScope>();
-    if (scope != null) {
-      return scope.info;
-    }
+    final scope = maybeOf(context);
+    if (scope != null) return scope;
 
-    // Graceful fallback: window-level info via MediaQuery
     final windowSize = MediaQuery.sizeOf(context);
-    final breakpoints = ResponsiveBreakpoints.standard;
+    final breakpoints = ResponsiveConfig.breakpointsOf(context);
     return ResponsiveInfo(
       windowSize: windowSize,
       localSize: windowSize,
@@ -39,7 +38,7 @@ class ResponsiveScope extends InheritedWidget {
     );
   }
 
-  /// Returns the nearest [ResponsiveInfo], or null if no [ResponsiveScope] exists.
+  /// Returns the nearest [ResponsiveInfo], or null when no scope exists.
   static ResponsiveInfo? maybeOf(BuildContext context) {
     return context.dependOnInheritedWidgetOfExactType<ResponsiveScope>()?.info;
   }

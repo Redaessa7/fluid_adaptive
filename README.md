@@ -1,81 +1,86 @@
-# Fluid Adaptive for Flutter 🚀
+# Fluid Adaptive for Flutter
 
-[![Dart](https://img.shields.io/badge/Dart-3.13+-blue.svg)](https://dart.dev)
-[![Flutter](https://img.shields.io/badge/Flutter-3.16+-02569B.svg)](https://flutter.dev)
-[![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
+[![pub package](https://img.shields.io/pub/v/fluid_adaptive.svg)](https://pub.dev/packages/fluid_adaptive)
+[![CI](https://github.com/redaessa7/fluid_adaptive/actions/workflows/ci.yml/badge.svg)](https://github.com/redaessa7/fluid_adaptive/actions/workflows/ci.yml)
+![Dart](https://img.shields.io/badge/Dart-3.2%2B-blue.svg)
+![Flutter](https://img.shields.io/badge/Flutter-3.16%2B-02569B.svg)
+![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)
 
-A modern, robust, and truly adaptive responsive design architecture for Flutter.
+An adaptive layout toolkit for Flutter built around the **available width**, not the device:
+Material 3 window size classes, builders that measure the space they really get, content-width
+budgeting, clamped fluid sizing, and responsive grids.
 
-Built to replace blind-scaling libraries (like `flutter_screenutil`) with **content-budgeting**, **adaptive multi-column layouts**, **symmetric dynamic gutters**, **fluid clamped sizing**, and **jitter-free window metrics**.
+<!-- TODO: add screenshots / GIF here (phone, tablet, desktop of the same screen),
+     then list them under `screenshots:` in pubspec.yaml so pub.dev shows them. -->
 
----
+## When to use it (and when not to)
 
-## 🛑 Why Traditional Scaling Libraries (ScreenUtil) Fail
-
-| Problem | `flutter_screenutil` (Blind Scaling) | `fluid_adaptive` (Adaptive Architecture) |
+| | Scaling libraries (`flutter_screenutil` style) | `fluid_adaptive` |
 |---|---|---|
-| **Tablets & iPads** | Multiplies buttons and text by ~2.5x, turning UIs into giant inflated phone screens. | Keeps ergonomic phone sizing, budgets content width (`contentMaxWidth`), and increases information density (multi-column layouts). |
-| **Local Subtrees & Split Views** | Always looks at full device screen width; breaks inside dialogs, bottom sheets, and split-screen views. | Uses `LayoutBuilder` local constraints; a 400px panel inside a desktop layout acts like a phone regardless of screen size. |
-| **Keyboard Jitter & Rotations** | Naive listeners drop 30+ frames when the keyboard pops up due to continuous rebuild storms. | `ResponsiveWindowGate` differentiates keyboard insets (debounced) from real rotation/resizes (rebuilt immediately). |
-| **Accessibility (Font Scaling)** | Hardcodes fixed `.sp` multiplications that battle against the user's OS accessibility text scaler. | Integrates with `MediaQuery.textScalerOf(context)` and applies safety clamps without breaking card layouts. |
-| **Foldables & Desktop Windows** | Glitches when windows resize dynamically or fold/unfold. | Real-time classification: `compact`, `medium`, `expanded`, and `large`. |
+| Idea | Multiply every value by `screenWidth / designWidth` | Choose the layout by available width; keep control sizes ergonomic |
+| Best for | Phone-only apps that must match a fixed Figma design pixel for pixel | Apps that also run on tablets, foldables, web and desktop |
+| On a tablet | Everything grows unless you cap it yourself | Same control sizes, more columns, capped content width |
+| Nested panels | Uses the screen width | Uses the width the subtree gets, **inside the builder widgets** |
 
----
+Both approaches are valid. Scaling is simpler for phone-only apps; this package pays off once the UI has to
+change *shape* across window sizes.
 
-## 📦 Key Concepts & Architecture
+## Install
 
-### 1. Window Size Classes (Material 3 Standard)
-Instead of checking device models or orientation, layouts adapt according to the width available to the widget:
-- **`compact`** (`< 600dp`): Single-column vertical phone rhythm.
-- **`medium`** (`600dp - 839dp`): Small tablets, unfolded foldables, landscape phones (2-column grids/split view).
-- **`expanded`** (`840dp - 1199dp`): Large tablets, landscape foldables, small laptops.
-- **`large`** (`>= 1200dp`): Desktop windows, ultra-wide displays.
-
-### 2. Content Budgeting & Symmetrical Gutters
-On wide displays, stretching a single column of text or buttons across the screen makes it unreadable.
-- `ResponsiveCenter`: Constrains max width (defaults to `720dp`) and centers the content.
-- `ResponsiveGutters.sideOf(width)`: Keeps standard `16dp` gutter on phones, but dynamically grows symmetric side padding on tablets:
-  $$\text{sideGutter} = \max(\text{compactGutter}, \frac{\text{width} - \text{contentMaxWidth}}{2})$$
-
-### 3. Fluid Clamped Dimensions
-No runaway inflation! `ResponsiveSpacing.fluid` or `context.responsiveFluid`:
-```dart
-// Smoothly scales from 14pt (at 375dp width) to 20pt (at 1200dp width)
-// Clamped: never shrinks below 14pt, never blows up past 20pt!
-final fontSize = context.responsiveFluid(min: 14, max: 20);
+```yaml
+dependencies:
+  fluid_adaptive: ^2.0.0
 ```
 
----
+Requires Flutter 3.16+ / Dart 3.2+. Pure Flutter widgets layer: no Material or Cupertino dependency.
+Coming from 1.x? See [MIGRATION.md](MIGRATION.md).
 
-## ⚡ Quick Start
+## Key concepts
 
-### 1. Wrap your root in `ResponsiveWindowGate`
-Eliminates keyboard rebuild storms and handles rotation flips immediately:
+### Window size classes (Material 3)
 
-```dart
-void main() {
-  runApp(
-    const ResponsiveWindowGate(
-      child: MyApp(),
-    ),
-  );
-}
-```
+| Class | Width | Typical device |
+|---|---|---|
+| `compact` | `< 600dp` | Phones |
+| `medium` | `600 - 839dp` | Small tablets, unfolded foldables, landscape phones |
+| `expanded` | `840 - 1199dp` | Large tablets, small laptops |
+| `large` | `>= 1200dp` | Desktop windows |
 
-### 2. Build Adaptive Screens with `context.responsive`
+### Local width vs window width (read this once)
+
+`context.responsive`, `context.isCompact`, `16.fluid(context, ...)` and the other context-based helpers return:
+
+- **inside** `ResponsiveBuilder`, `ResponsiveSliverBuilder`, `ResponsiveLayout`, `ResponsiveRowColumn`,
+  `ResponsiveGridView` or `ResponsiveSliverGrid`: the size of **that subtree**;
+- **anywhere else**: the size of the **whole window** (`MediaQuery.sizeOf`).
+
+A screen built straight from `build(context)` therefore sees the window. Wrap a subtree in `ResponsiveBuilder`
+when it can be narrower than the window (side panels, dialogs, split views).
+`ResponsiveBuilder` uses a `LayoutBuilder`, so it cannot be placed under `IntrinsicHeight` / `IntrinsicWidth`.
+
+### Content width: choose the right tool
+
+| Content | Use | Why |
+|---|---|---|
+| A box (form, card, detail page) | `ResponsiveCenter(maxWidth: 800, child: ...)` | Caps and centres the box |
+| A scrollable (list, grid) | `ListView(padding: context.responsive.gutters(contentMaxWidth: 800), ...)` | The scroll view keeps the full width, so scrollbars and gestures stay at the screen edge |
+| A `CustomScrollView` | `ResponsiveSliverCenter(sliver: ...)` | Same idea for slivers |
+
+Use **one** of them for the same content. Stacking them shrinks it twice.
+
+## Quick start
 
 ```dart
 class HomeScreen extends StatelessWidget {
+  const HomeScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
-    final info = context.responsive;
-
     return Scaffold(
-      // ResponsiveCenter prevents UI from stretching endlessly on tablets/desktop
       body: ResponsiveCenter(
         maxWidth: 800,
         child: SingleChildScrollView(
-          padding: context.responsive.gutters(compact: 16, vertical: 16),
+          padding: const EdgeInsets.all(16),
           child: Column(
             children: [
               Text(
@@ -86,19 +91,13 @@ class HomeScreen extends StatelessWidget {
                   expanded: Theme.of(context).textTheme.headlineLarge,
                 ),
               ),
-
-              // Automatically switches between Column (mobile) and Row (tablet/desktop)
-              ResponsiveRowColumn(
+              context.spacing.md.gapH,
+              // Column on phones, Row from 600dp up
+              const ResponsiveRowColumn(
                 spacing: 16,
                 children: [
-                  ResponsiveRowColumnItem(
-                    rowFlex: 1,
-                    child: FilterSidebar(),
-                  ),
-                  ResponsiveRowColumnItem(
-                    rowFlex: 3,
-                    child: MainFeed(),
-                  ),
+                  ResponsiveRowColumnItem(rowFlex: 1, child: FilterSidebar()),
+                  ResponsiveRowColumnItem(rowFlex: 3, child: MainFeed()),
                 ],
               ),
             ],
@@ -110,110 +109,160 @@ class HomeScreen extends StatelessWidget {
 }
 ```
 
----
-
-## ⚡ Smart Numeric Extensions (Easy as ScreenUtil, but Safe!)
-
-If you love the speed and simplicity of `16.w` or `14.sp`, but want **guaranteed safety against tablet-inflation and overflow**, use the built-in numeric extensions:
+## Widgets
 
 ```dart
-// 1. Clamped Fluid Scaling (Scales gently on larger viewports, never exceeds max)
-Padding(padding: EdgeInsets.all(16.fluid(context, max: 24)))
-
-// 2. Adaptive Screen Class Selection
-width: 200.responsive(context, tablet: 320, desktop: 450)
-
-// 3. Proportional Width/Height with Safety Clamps (Prevents ballooning)
-width: 150.clampedW(context)  // Clamped within [0.85x - 1.35x] of design width
-
-// 4. Accessible & Clamped Typography
-Text('Title', style: TextStyle(fontSize: 16.sp(context))) // Honors TextScaler safely
-
-// 5. Quick Sized Gaps
-16.gapH  // SizedBox(height: 16)
-24.gapW  // SizedBox(width: 24)
-
-// 6. Standard 8-point Design Spacing Tokens
-SizedBox(height: context.spacing.md) // 16 on phone, 20 on wide screens
-```
-
----
-
-## 🛠️ Adaptive Widgets Suite
-
-### `ResponsiveLayout`
-Declarative widget switching based on breakpoint class:
-```dart
+// Pick a layout by available width (a missing larger one falls back to the nearest smaller one)
 ResponsiveLayout(
-  compact: (context) => MobileLayout(),
-  medium: (context) => TabletLayout(),
-  expanded: (context) => DesktopLayout(),
+  compact: (context) => const MobileLayout(),
+  medium: (context) => const TabletLayout(),
+  expanded: (context) => const DesktopLayout(),
 )
-```
 
-### `ResponsiveCenter`
-Capping content width with symmetric margin centering:
-```dart
-ResponsiveCenter(
-  maxWidth: 720,
-  child: ProfileForm(),
-)
-```
-
-### `ResponsiveGridView`
-Auto-calculates column count based on available space and minimum tile width:
-```dart
+// Grid: every tile is at least minTileWidth wide (spacing and padding included)
 ResponsiveGridView.builder(
-  minTileWidth: 170, // Each tile gets at least 170dp
+  minTileWidth: 170,
   itemCount: items.length,
-  itemBuilder: (context, index) => ItemCard(items[index]),
+  itemBuilder: (context, i) => ItemCard(items[i]),
 )
+
+// Same for CustomScrollView
+ResponsiveSliverGrid.builder(itemCount: items.length, itemBuilder: (context, i) => ItemCard(items[i]))
+
+// Build from the space you get
+ResponsiveBuilder(builder: (context, info) => Text('${info.localWidth} dp'))
+ResponsiveSliverBuilder(builder: (context, info) => SliverToBoxAdapter(child: ...))
+
+// Rebuild only when the size class changes (see Performance)
+ResponsiveClassBuilder(builder: (context, sizeClass) => ...)
 ```
 
-### `ResponsiveRowColumn`
-Replaces nested Row/Column boilerplate:
-```dart
-ResponsiveRowColumn(
-  spacing: 12,
-  isRow: (info) => info.isWide, // Row on tablet/desktop, Column on phone
-  children: [
-    ResponsiveRowColumnItem(child: WidgetA()),
-    ResponsiveRowColumnItem(child: WidgetB()),
-  ],
-)
-```
+Also: `ResponsiveCenter`, `ResponsiveSliverCenter`, `ResponsiveRowColumn`.
 
----
-
-## 📐 BuildContext Extensions Cheatsheet
+## BuildContext helpers
 
 ```dart
-// Booleans
-context.isCompact   // < 600dp (Phone)
-context.isMedium    // 600 - 839dp (Tablet/Foldable)
-context.isExpanded  // 840 - 1199dp (Large tablet/Desktop)
-context.isWide      // >= 600dp (Multi-column viewports)
-context.isLandscape // width > height
+context.isCompact   // < 600dp
+context.isMedium    // 600 - 839dp
+context.isExpanded  // 840 - 1199dp
+context.isLarge     // >= 1200dp
+context.isWide      // >= 600dp
+context.isLandscape / context.isPortrait
 
-// Values
 context.responsiveValue<int>(compact: 1, medium: 2, expanded: 4);
-context.responsiveGutter(compact: 16);
-context.responsiveColumns(minTileWidth: 180);
-context.responsiveSpacing(compact: 12, medium: 16, expanded: 24);
-context.responsiveFluid(min: 14, max: 20);
+context.spacing.md                       // 16 compact, 20 wide (xs, sm, md, lg, xl, xxl)
+context.responsive.columns(minTileWidth: 180);
+context.responsive.fluid(min: 14, max: 20);
+context.responsive.gutters(vertical: 16);
 ```
 
----
+## Numeric helpers
 
-## 🧪 Testing
+```dart
+EdgeInsets.all(16.fluid(context, max: 24))        // 16 -> 24 between 375dp and the expanded breakpoint, clamped
+200.responsive(context, medium: 320, large: 450)  // value per size class (falls back to smaller classes)
+150.clampedW(context)                             // scales with width, factor clamped to [0.85, 1.35]
+50.widthPercent(context)                          // 50% of the available width
+24.textScaled(context, maxScaleFactor: 2)         // follows the system text scale (non-text sizes only)
+16.gapH   24.gapW                                 // SizedBox shortcuts
+```
 
-The library is fully covered with comprehensive unit and widget tests:
+### Text scaling: do not pre-scale font sizes
+
+`Text` already multiplies `fontSize` by the user's text scale. Passing a pre-scaled size makes text grow by the
+*square* of the setting, so `fontSize: 16.textScaled(context)` is **wrong**. Use a plain `fontSize` and, if you
+must limit growth, let Flutter do it:
+
+```dart
+MediaQuery.withClampedTextScaling(maxScaleFactor: 2.0, child: ...)
+```
+
+`textScaled` is for sizes that are not text: icon sizes, minimum tap-target heights, avatars.
+
+## App-wide breakpoints
+
+```dart
+MaterialApp(
+  builder: (context, child) => ResponsiveConfig(
+    breakpoints: const ResponsiveBreakpoints(compactMax: 700, mediumMax: 1000, expandedMax: 1400),
+    child: child!,
+  ),
+  home: const HomeScreen(),
+)
+```
+
+Everything without explicit breakpoints uses them; a widget's own `breakpoints:` argument still wins.
+
+## Performance
+
+The package is plain arithmetic plus `LayoutBuilder`. The only real cost is that the builder widgets rebuild their
+subtree whenever the available size changes: rare on phones, every frame while a desktop/web window is dragged.
+For heavy screens use `ResponsiveClassBuilder`, which rebuilds **only when the size class changes**. It only
+gives you the size class; use `ResponsiveBuilder` when you need the exact width.
+Measure your own screens with Flutter DevTools; we do not claim fixed numbers.
+
+## Testing your layouts
+
+```dart
+// Pure unit test, no widget tree:
+final info = ResponsiveInfo.fromSize(const Size(700, 900));
+expect(info.isMedium, isTrue);
+
+// Widget test at a given window size:
+testWidgets('shows the sidebar on tablets', (tester) async {
+  tester.view.physicalSize = const Size(900, 1200);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.reset);
+
+  await tester.pumpWidget(const MaterialApp(home: MyScreen()));
+  expect(find.byType(FilterSidebar), findsOneWidget);
+});
+```
+
+## Coming from `flutter_screenutil`?
+
+| screenutil | fluid_adaptive |
+|---|---|
+| `16.w` / `16.h` (scale by design size) | `16.fluid(context, max: 24)` or `16.clampedW(context)` for a bounded scale; plain `16` for fixed sizes |
+| `14.sp` | plain `fontSize: 14` (Flutter applies the text scale); `MediaQuery.withClampedTextScaling` to cap it |
+| `ScreenUtilInit(designSize: ...)` | nothing to initialise |
+| separate tablet layout by hand | `ResponsiveLayout`, `ResponsiveRowColumn`, `ResponsiveGridView` |
+
+None of the extension names (`responsive`, `fluid`, `clampedW`, `widthPercent`, `textScaled`, `gapW`, ...) is one of screenutil's `.w` / `.h` / `.sp` / `.r`, so you can usually import both packages in the same file while you migrate.
+
+## Stability and support policy
+
+- **Semantic versioning.** Patch = fixes, minor = additive features, major = breaking changes. Public APIs are
+  deprecated for at least one minor release before removal in the next major.
+- **Supported SDKs.** Flutter 3.16+ / Dart 3.2+. CI runs the tests on the minimum and on current stable.
+- **Platforms.** Pure Dart/Flutter, no native code: Android, iOS, web, Windows, macOS, Linux.
+- **Safety.** Odd input (zero, negative, NaN or infinite sizes) falls back to safe values in release builds;
+  developer mistakes trip an `assert` in debug.
+- **Reporting issues.** See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).
+
+## Production checklist
+
+- Pin a version range (`^2.0.0`) and commit your `pubspec.lock`.
+- Wrap subtrees that can be narrower than the window in `ResponsiveBuilder`.
+- One content-width mechanism per piece of content.
+- Prefer fixed sizes for controls; use `fluid` only where growth is intended.
+- Test at least three widths (for example 360, 800 and 1280).
+- Test with large system font sizes.
+
+## Known limitations
+
+- Sliver widgets (`ResponsiveSliverBuilder`, `ResponsiveSliverGrid`, `ResponsiveSliverCenter`) support vertically
+  scrolling viewports.
+- Window size is read from `MediaQuery`; multi-window desktop setups are not specifically handled.
+
+## Development
+
 ```bash
-flutter test
+flutter pub get
 flutter analyze
+flutter test
 ```
 
----
+## License
 
-## 📄 License
-MIT License. Created by Reda Essa.
+MIT. Created by Reda Essa.

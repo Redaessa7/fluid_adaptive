@@ -1,0 +1,29 @@
+# Publishes to pub.dev when you push a tag like v1.1.0.
+#
+# One-time setup on pub.dev: Package -> Admin -> Automated publishing ->
+# enable "Publishing from GitHub Actions", repository redaessa7/fluid_adaptive,
+# tag pattern v{{version}}.
+# Verify the steps against https://dart.dev/tools/pub/automated-publishing
+# (Flutter packages need the Flutter SDK) before relying on it.
+name: Publish to pub.dev
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+      - run: flutter pub publish --force

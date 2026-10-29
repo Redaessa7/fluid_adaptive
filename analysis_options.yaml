@@ -1,7 +1,11 @@
 include: package:flutter_lints/flutter.yaml
 
 analyzer:
+  language:
+    strict-casts: true
+    strict-raw-types: true
   exclude:
+    - example/**
     - build/**
     - android/**
     - ios/**
@@ -10,5 +14,6 @@ analyzer:
     - macos/**
     - linux/**
 
-# Additional information about this file can be found at
-# https://dart.dev/guides/language/analysis-options
+linter:
+  rules:
+    - public_member_api_docs

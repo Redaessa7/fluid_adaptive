@@ -1,30 +1,34 @@
 import 'package:flutter/widgets.dart';
-import 'package:fluid_adaptive/src/gutters/gutters.dart';
+import 'package:fluid_adaptive/src/core/defaults.dart';
 
-/// Centers [child] and caps its maximum width so phone-designed content never
-/// over-stretches across tablets, foldables, or desktop windows.
+/// Caps the width of [child] and centres it, so phone-designed content does
+/// not stretch across tablets and desktop windows.
 ///
-/// Below [maxWidth], it behaves as a natural pass-through with zero visual disruption.
-/// Above [maxWidth], it constrains the child and centers it nicely.
+/// Below [maxWidth] it is a pass-through. It does not create a responsive
+/// scope: `context.responsive` inside still describes the window unless you
+/// add a `ResponsiveBuilder`. For scrollable content prefer gutters
+/// (`ResponsiveInfo.gutters`) or `ResponsiveSliverCenter`, which keep the
+/// scroll view full-width. Use one mechanism per screen, not both.
 class ResponsiveCenter extends StatelessWidget {
+  /// Creates a width-capping wrapper. [maxWidth] must be positive.
   const ResponsiveCenter({
     super.key,
     required this.child,
-    this.maxWidth = ResponsiveGutters.defaultContentMaxWidth,
+    this.maxWidth = ResponsiveDefaults.contentMaxWidth,
     this.alignment = Alignment.topCenter,
     this.padding,
-  });
+  }) : assert(maxWidth > 0, 'maxWidth must be positive');
 
-  /// The widget to center and constrain.
+  /// The content to constrain.
   final Widget child;
 
-  /// The maximum content width budget. Defaults to 720dp.
+  /// Maximum content width in logical pixels (default 720).
   final double maxWidth;
 
-  /// Alignment within the available parent space. Defaults to [Alignment.topCenter].
+  /// Where the capped content sits in the available space.
   final AlignmentGeometry alignment;
 
-  /// Optional padding applied around the constrained content box.
+  /// Optional padding inside the capped box.
   final EdgeInsetsGeometry? padding;
 
   @override
@@ -34,13 +38,11 @@ class ResponsiveCenter extends StatelessWidget {
       child: child,
     );
 
-    if (padding != null) {
-      content = Padding(padding: padding!, child: content);
+    final EdgeInsetsGeometry? resolvedPadding = padding;
+    if (resolvedPadding != null) {
+      content = Padding(padding: resolvedPadding, child: content);
     }
 
-    return Align(
-      alignment: alignment,
-      child: content,
-    );
+    return Align(alignment: alignment, child: content);
   }
 }
